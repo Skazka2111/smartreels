@@ -1,0 +1,60 @@
+name: Build Smart Reels Studio
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install ".[dev]"
+      - env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
+
+  windows:
+    needs: tests
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          architecture: "x64"
+      - shell: powershell
+        run: ./packaging/windows/build-portable.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Smart-Reels-Studio-Windows-x64-v010
+          path: artifacts/windows/Smart_Reels_Studio_Windows_x64_v010.zip
+
+  macos:
+    needs: tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            label: ARM64
+          - runner: macos-15-intel
+            label: Intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+      - run: chmod +x packaging/macos/build-macos.sh && packaging/macos/build-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Smart-Reels-Studio-macOS-${{ matrix.label }}-v010
+          path: artifacts/macos/Smart_Reels_Studio_macOS_${{ matrix.label }}_v010.zip
+
